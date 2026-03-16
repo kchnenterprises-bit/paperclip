@@ -29,6 +29,8 @@ export const queryKeys = {
     comment: (issueId: string, commentId: string) =>
       ["issues", "comments", issueId, commentId] as const,
     attachments: (issueId: string) => ["issues", "attachments", issueId] as const,
+    documents: (issueId: string) => ["issues", "documents", issueId] as const,
+    documentRevisions: (issueId: string, key: string) => ["issues", "document-revisions", issueId, key] as const,
     activity: (issueId: string) => ["issues", "activity", issueId] as const,
     runs: (issueId: string) => ["issues", "runs", issueId] as const,
     approvals: (issueId: string) => ["issues", "approvals", issueId] as const,
@@ -77,4 +79,14 @@ export const queryKeys = {
   liveRuns: (companyId: string) => ["live-runs", companyId] as const,
   runIssues: (runId: string) => ["run-issues", runId] as const,
   org: (companyId: string) => ["org", companyId] as const,
+  plugins: {
+    all: ["plugins"] as const,
+    examples: ["plugins", "examples"] as const,
+    detail: (pluginId: string) => ["plugins", pluginId] as const,
+    health: (pluginId: string) => ["plugins", pluginId, "health"] as const,
+    uiContributions: ["plugins", "ui-contributions"] as const,
+    config: (pluginId: string) => ["plugins", pluginId, "config"] as const,
+    dashboard: (pluginId: string) => ["plugins", pluginId, "dashboard"] as const,
+    logs: (pluginId: string) => ["plugins", pluginId, "logs"] as const,
+  },
 };
