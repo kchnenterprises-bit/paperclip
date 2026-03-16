@@ -1,8 +1,13 @@
 import { Router } from "express";
+import path from "node:path";
 import type { Db } from "@paperclipai/db";
 import { and, count, eq, gt, isNull, sql } from "drizzle-orm";
 import { instanceUserRoles, invites } from "@paperclipai/db";
 import type { DeploymentExposure, DeploymentMode } from "@paperclipai/shared";
+
+/** Dev-only: true when this process is the repo dev server (so health can expose cwd to verify fork). */
+const isDevServer =
+  process.env.PAPERCLIP_UI_DEV_MIDDLEWARE === "true" || process.env.NODE_ENV !== "production";
 
 export function healthRoutes(
   db?: Db,
@@ -54,7 +59,7 @@ export function healthRoutes(
       }
     }
 
-    res.json({
+    const body: Record<string, unknown> = {
       status: "ok",
       deploymentMode: opts.deploymentMode,
       deploymentExposure: opts.deploymentExposure,
@@ -64,7 +69,13 @@ export function healthRoutes(
       features: {
         companyDeletionEnabled: opts.companyDeletionEnabled,
       },
-    });
+    };
+    if (isDevServer) {
+      body.devServerCwd = path.resolve(process.cwd());
+      body.devNote =
+        "Dashboard and API are served from this directory. If this path is not your fork, run `pnpm dev` from the fork root (e.g. paperclip-fork).";
+    }
+    res.json(body);
   });
 
   return router;

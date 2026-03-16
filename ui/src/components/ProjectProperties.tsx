@@ -255,7 +255,8 @@ export function ProjectProperties({ project, onUpdate, onFieldUpdate, getFieldSa
     };
   };
 
-  const isAbsolutePath = (value: string) => value.startsWith("/") || /^[A-Za-z]:[\\/]/.test(value);
+  const isAbsoluteOrHomePath = (value: string) =>
+    value.startsWith("/") || value === "~" || value.startsWith("~/") || /^[A-Za-z]:[\\/]/.test(value);
 
   const isGitHubRepoUrl = (value: string) => {
     try {
@@ -302,8 +303,8 @@ export function ProjectProperties({ project, onUpdate, onFieldUpdate, getFieldSa
 
   const submitLocalWorkspace = () => {
     const cwd = workspaceCwd.trim();
-    if (!isAbsolutePath(cwd)) {
-      setWorkspaceError("Local folder must be a full absolute path.");
+    if (!isAbsoluteOrHomePath(cwd)) {
+      setWorkspaceError("Local folder must be a full path (e.g. /path/to/folder or ~/folder).");
       return;
     }
     setWorkspaceError(null);

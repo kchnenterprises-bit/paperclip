@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type ChangeEvent } from "react";
 import { Link, useLocation, useNavigate, useParams } from "@/lib/router";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQueries, useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { issuesApi } from "../api/issues";
 import { activityApi } from "../api/activity";
 import { heartbeatsApi } from "../api/heartbeats";
@@ -336,6 +336,66 @@ export function IssueDetail() {
       return meta ? { ...comment, ...meta } : comment;
     });
   }, [activity, comments, linkedRuns]);
+
+  const missingTriggerCommentIds = useMemo(() => {
+    if (!issueId || !timelineRuns.length) return [];
+    const commentIds = new Set((comments ?? []).map((c) => c.id));
+    const missing: string[] = [];
+    for (const run of timelineRuns) {
+      const triggerId =
+        (run as { triggerCommentId?: string | null }).triggerCommentId ??
+        (run as { trigger_comment_id?: string | null }).trigger_comment_id;
+      if (triggerId && !commentIds.has(triggerId)) {
+        commentIds.add(triggerId);
+        missing.push(triggerId);
+      }
+    }
+    return [...new Set(missing)];
+  }, [issueId, comments, timelineRuns]);
+
+  const fetchedTriggerComments = useQueries({
+    queries: missingTriggerCommentIds.map((commentId) => ({
+      queryKey: queryKeys.issues.comment(issueId!, commentId),
+      queryFn: () => issuesApi.getComment(issueId!, commentId),
+      enabled: !!issueId && !!commentId,
+      staleTime: 60_000,
+    })),
+  });
+
+  const commentsForTimeline = useMemo(() => {
+    const byId = new Map(
+      commentsWithRunMeta.map((c) => [c.id, c]),
+    );
+    for (const result of fetchedTriggerComments) {
+      if (result.data && !byId.has(result.data.id)) {
+        byId.set(result.data.id, result.data);
+      }
+    }
+    return [...byId.values()];
+  }, [commentsWithRunMeta, fetchedTriggerComments]);
+
+  useEffect(() => {
+    const prefix = "[paperclip-timeline]";
+    console.log(prefix, "comments (from API):", {
+      count: (comments ?? []).length,
+      ids: (comments ?? []).map((c) => c.id),
+      byAuthor: (comments ?? []).map((c) => ({
+        id: c.id,
+        authorUserId: (c as { authorUserId?: string | null }).authorUserId ?? "(none)",
+        authorAgentId: (c as { authorAgentId?: string | null }).authorAgentId ?? "(none)",
+      })),
+    });
+    console.log(prefix, "commentsWithRunMeta count:", commentsWithRunMeta.length);
+    console.log(prefix, "missingTriggerCommentIds (fetching these):", missingTriggerCommentIds);
+    console.log(prefix, "commentsForTimeline:", {
+      count: commentsForTimeline.length,
+      ids: commentsForTimeline.map((c) => c.id),
+    });
+    console.log(prefix, "timelineRuns with triggerCommentId:", (timelineRuns ?? []).map((r) => ({
+      runId: r.runId,
+      triggerCommentId: (r as { triggerCommentId?: string | null }).triggerCommentId ?? (r as { trigger_comment_id?: string | null }).trigger_comment_id,
+    })));
+  }, [comments, commentsWithRunMeta, missingTriggerCommentIds, commentsForTimeline, timelineRuns]);
 
   const issueCostSummary = useMemo(() => {
     let input = 0;
@@ -770,7 +830,7 @@ export function IssueDetail() {
 
         <TabsContent value="comments">
           <CommentThread
-            comments={commentsWithRunMeta}
+            comments={commentsForTimeline}
             linkedRuns={timelineRuns}
             issueStatus={issue.status}
             agentMap={agentMap}

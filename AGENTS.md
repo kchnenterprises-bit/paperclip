@@ -49,12 +49,27 @@ curl http://localhost:3100/api/health
 curl http://localhost:3100/api/companies
 ```
 
-Reset local dev DB:
+Reset local dev DB (only if you want a fresh DB; this deletes all data):
 
 ```sh
-rm -rf data/pglite
+# Embedded DB lives under PAPERCLIP_HOME/instances/default/db (default: ~/.paperclip/instances/default/db)
+rm -rf ~/.paperclip/instances/default/db
 pnpm dev
 ```
+
+**Running from this fork (dashboard using fork code):**  
+The dashboard and API at `http://localhost:3100` are served by whatever process you started. To ensure you're running **this fork's** code: (1) Start the server from the **fork root**: `cd /path/to/paperclip-fork && pnpm dev`. (2) Open `http://localhost:3100/api/health` — in dev the response includes `devServerCwd`; it should be the path to this fork. If it points to another folder, the dashboard is running that code, not the fork.
+
+**Keeping one data directory (comments / data “disappearing”):**  
+If comments or data seem to vanish when you restart, the server may be picking a different config or home dir. To force a single data location, start the fork with explicit env and always use the same command:
+
+```sh
+cd /Users/andrewmcculloch/paperclip-fork
+export PAPERCLIP_HOME="${PAPERCLIP_HOME:-$HOME/.paperclip}"
+pnpm dev
+```
+
+Use the same `PAPERCLIP_HOME` every time (or leave it unset so it defaults to `~/.paperclip`). Do not mix `npx paperclipai` and `pnpm dev` without understanding which one uses which config; when in doubt, use only `pnpm dev` from the fork with the env above.
 
 ## 5. Core Engineering Rules
 
@@ -135,7 +150,17 @@ When adding endpoints:
 - Use company selection context for company-scoped pages
 - Surface failures clearly; do not silently ignore API errors
 
-## 10. Definition of Done
+## 10. Agent instructions and workspace (relative paths)
+
+When an agent’s instructions file lives outside the server repo (e.g. in a separate `paperclip-workspace` directory), use **project workspace + relative path** for portability:
+
+1. **Create a project** whose (primary) workspace has **Local folder** set to the directory that contains your agent instructions. In the UI: New project → set "Local folder" to that path. The path **must exist and be readable by the server process** when the run starts (same machine and user, or mounted volume). Paths starting with `~` are resolved using the server’s home directory; prefer e.g. `~/paperclip-workspace` when the folder is in your home so it works regardless of home’s absolute path.
+2. **Set the agent’s instructions path** to a path **relative** to that folder (e.g. `agents/head_of_delivery/HEARTBEAT.md`). In the adapter config: `instructionsFilePath: "agents/head_of_delivery/HEARTBEAT.md"`.
+3. **Assign issues to that project** when they should run with that workspace. The run then uses the project workspace `cwd`, so the relative instructions path resolves.
+
+Relative paths are resolved by the adapter against the run’s workspace `cwd` first, then `process.cwd()`. If the project workspace path is not available (missing or not visible to the server), the run falls back to a default workspace and the relative instructions path will not resolve—fix by using a path the server can see (e.g. `~/paperclip-workspace`) or by ensuring the absolute path exists where the server runs.
+
+## 11. Definition of Done
 
 A change is done when all are true:
 

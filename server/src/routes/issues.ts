@@ -792,6 +792,19 @@ export function issueRoutes(db: Db, storage: StorageService) {
     }
     assertCompanyAccess(req, issue.companyId);
     const comments = await svc.listComments(id);
+    logger.info(
+      {
+        issueId: id,
+        count: comments.length,
+        commentIds: comments.map((c: { id: string; authorUserId?: string | null; authorAgentId?: string | null }) => c.id),
+        byAuthor: comments.map((c: { id: string; authorUserId?: string | null; authorAgentId?: string | null }) => ({
+          id: c.id,
+          user: c.authorUserId ?? "(none)",
+          agent: c.authorAgentId ?? "(none)",
+        })),
+      },
+      "[comment-list] GET comments returned",
+    );
     res.json(comments);
   });
 
@@ -908,8 +921,19 @@ export function issueRoutes(db: Db, storage: StorageService) {
 
     const comment = await svc.addComment(id, req.body.body, {
       agentId: actor.agentId ?? undefined,
-      userId: actor.actorType === "user" ? actor.actorId : undefined,
+      userId: actor.agentId ? undefined : (actor.actorId ?? undefined),
     });
+
+    logger.info(
+      {
+        issueId: id,
+        commentId: comment.id,
+        actorType: actor.actorType,
+        authorUserId: comment.authorUserId ?? null,
+        authorAgentId: comment.authorAgentId ?? null,
+      },
+      "[comment-add] comment saved; listComments should return it",
+    );
 
     await logActivity(db, {
       companyId: currentIssue.companyId,

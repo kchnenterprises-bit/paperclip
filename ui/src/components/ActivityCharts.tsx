@@ -88,9 +88,9 @@ export function RunActivityChart({ runs }: { runs: HeartbeatRun[] }) {
             <div key={day} className="flex-1 h-full flex flex-col justify-end" title={`${day}: ${total} runs`}>
               {total > 0 ? (
                 <div className="flex flex-col-reverse gap-px overflow-hidden" style={{ height: `${heightPct}%`, minHeight: 2 }}>
-                  {entry.succeeded > 0 && <div className="bg-emerald-500" style={{ flex: entry.succeeded }} />}
-                  {entry.failed > 0 && <div className="bg-red-500" style={{ flex: entry.failed }} />}
-                  {entry.other > 0 && <div className="bg-neutral-500" style={{ flex: entry.other }} />}
+                  {entry.succeeded > 0 && <div className="bg-chart-2" style={{ flex: entry.succeeded }} />}
+                  {entry.failed > 0 && <div className="bg-destructive" style={{ flex: entry.failed }} />}
+                  {entry.other > 0 && <div className="bg-muted" style={{ flex: entry.other }} />}
                 </div>
               ) : (
                 <div className="bg-muted/30 rounded-sm" style={{ height: 2 }} />
@@ -105,10 +105,10 @@ export function RunActivityChart({ runs }: { runs: HeartbeatRun[] }) {
 }
 
 const priorityColors: Record<string, string> = {
-  critical: "#ef4444",
-  high: "#f97316",
-  medium: "#eab308",
-  low: "#6b7280",
+  critical: "var(--destructive)",
+  high: "var(--chart-4)",
+  medium: "var(--chart-3)",
+  low: "var(--muted)",
 };
 
 const priorityOrder = ["critical", "high", "medium", "low"] as const;
@@ -158,13 +158,13 @@ export function PriorityChart({ issues }: { issues: { priority: string; createdA
 }
 
 const statusColors: Record<string, string> = {
-  todo: "#3b82f6",
-  in_progress: "#8b5cf6",
-  in_review: "#a855f7",
-  done: "#10b981",
-  blocked: "#ef4444",
-  cancelled: "#6b7280",
-  backlog: "#64748b",
+  todo: "var(--chart-3)",
+  in_progress: "var(--chart-1)",
+  in_review: "var(--chart-1)",
+  done: "var(--chart-2)",
+  blocked: "var(--destructive)",
+  cancelled: "var(--muted)",
+  backlog: "var(--muted)",
 };
 
 const statusLabels: Record<string, string> = {
@@ -208,7 +208,7 @@ export function IssueStatusChart({ issues }: { issues: { status: string; created
               {total > 0 ? (
                 <div className="flex flex-col-reverse gap-px overflow-hidden" style={{ height: `${heightPct}%`, minHeight: 2 }}>
                   {statusOrder.map(s => (entry[s] ?? 0) > 0 ? (
-                    <div key={s} style={{ flex: entry[s], backgroundColor: statusColors[s] ?? "#6b7280" }} />
+                    <div key={s} style={{ flex: entry[s], backgroundColor: statusColors[s] ?? "var(--muted)" }} />
                   ) : null)}
                 </div>
               ) : (
@@ -219,7 +219,7 @@ export function IssueStatusChart({ issues }: { issues: { status: string; created
         })}
       </div>
       <DateLabels days={days} />
-      <ChartLegend items={statusOrder.map(s => ({ color: statusColors[s] ?? "#6b7280", label: statusLabels[s] ?? s }))} />
+      <ChartLegend items={statusOrder.map(s => ({ color: statusColors[s] ?? "var(--muted)", label: statusLabels[s] ?? s }))} />
     </div>
   );
 }
@@ -245,7 +245,7 @@ export function SuccessRateChart({ runs }: { runs: HeartbeatRun[] }) {
         {days.map(day => {
           const entry = grouped.get(day)!;
           const rate = entry.total > 0 ? entry.succeeded / entry.total : 0;
-          const color = entry.total === 0 ? undefined : rate >= 0.8 ? "#10b981" : rate >= 0.5 ? "#eab308" : "#ef4444";
+          const color = entry.total === 0 ? undefined : rate >= 0.8 ? "var(--chart-2)" : rate >= 0.5 ? "var(--chart-4)" : "var(--destructive)";
           return (
             <div key={day} className="flex-1 h-full flex flex-col justify-end" title={`${day}: ${entry.total > 0 ? Math.round(rate * 100) : 0}% (${entry.succeeded}/${entry.total})`}>
               {entry.total > 0 ? (

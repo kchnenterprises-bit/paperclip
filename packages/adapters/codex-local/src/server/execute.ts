@@ -309,7 +309,7 @@ export async function execute(ctx: AdapterExecutionContext): Promise<AdapterExec
       `Configured instructionsFilePath ${instructionsFilePath}, but file could not be read; continuing without injected instructions.`,
     ];
   })();
-  const renderedPrompt = renderTemplate(promptTemplate, {
+  let renderedPrompt = renderTemplate(promptTemplate, {
     agentId: agent.id,
     companyId: agent.companyId,
     runId,
@@ -318,6 +318,25 @@ export async function execute(ctx: AdapterExecutionContext): Promise<AdapterExec
     run: { id: runId, source: "on_demand" },
     context,
   });
+  const issuePrompt = context?.paperclipIssueForPrompt as
+    | { identifier?: string | null; title?: string; description?: string }
+    | undefined;
+  if (
+    issuePrompt &&
+    (issuePrompt.title?.trim() || issuePrompt.description?.trim() || issuePrompt.identifier)
+  ) {
+    const idLine = issuePrompt.identifier?.trim() ?? "—";
+    const titleLine = issuePrompt.title?.trim() ?? "";
+    const desc = issuePrompt.description?.trim() ?? "";
+    renderedPrompt += `\n\n---\n## Paperclip task (full issue — use this as your scope)\n\n**${idLine}**${titleLine ? ` — ${titleLine}` : ""}\n\n### Issue description\n\n${desc || "(no description)"}\n\nProceed with this work.\n`;
+  }
+  const wakeCommentBody =
+    typeof context?.wakeCommentBody === "string" && context.wakeCommentBody.trim().length > 0
+      ? context.wakeCommentBody.trim()
+      : null;
+  if (wakeCommentBody) {
+    renderedPrompt += `\n\n---\nLatest comment on this issue:\n\n${wakeCommentBody}`;
+  }
   const prompt = `${instructionsPrefix}${renderedPrompt}`;
 
   const buildArgs = (resumeSessionId: string | null) => {

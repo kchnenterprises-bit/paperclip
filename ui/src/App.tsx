@@ -26,6 +26,7 @@ import { DesignGuide } from "./pages/DesignGuide";
 import { InstanceSettings } from "./pages/InstanceSettings";
 import { RunTranscriptUxLab } from "./pages/RunTranscriptUxLab";
 import { OrgChart } from "./pages/OrgChart";
+import { IssueTimelinePage } from "./pages/IssueTimelinePage";
 import { NewAgent } from "./pages/NewAgent";
 import { AuthPage } from "./pages/Auth";
 import { BoardClaimPage } from "./pages/BoardClaim";
@@ -114,6 +115,7 @@ function boardRoutes() {
       <Route path="settings" element={<LegacySettingsRedirect />} />
       <Route path="settings/*" element={<LegacySettingsRedirect />} />
       <Route path="org" element={<OrgChart />} />
+      <Route path="timeline" element={<IssueTimelinePage />} />
       <Route path="agents" element={<Navigate to="/agents/all" replace />} />
       <Route path="agents/all" element={<Agents />} />
       <Route path="agents/active" element={<Agents />} />

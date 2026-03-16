@@ -94,7 +94,8 @@ export function NewProjectDialog() {
     setWorkspaceError(null);
   }
 
-  const isAbsolutePath = (value: string) => value.startsWith("/") || /^[A-Za-z]:[\\/]/.test(value);
+  const isAbsoluteOrHomePath = (value: string) =>
+    value.startsWith("/") || value === "~" || value.startsWith("~/") || /^[A-Za-z]:[\\/]/.test(value);
 
   const isGitHubRepoUrl = (value: string) => {
     try {
@@ -137,8 +138,8 @@ export function NewProjectDialog() {
     const localPath = workspaceLocalPath.trim();
     const repoUrl = workspaceRepoUrl.trim();
 
-    if (localRequired && !isAbsolutePath(localPath)) {
-      setWorkspaceError("Local folder must be a full absolute path.");
+    if (localRequired && !isAbsoluteOrHomePath(localPath)) {
+      setWorkspaceError("Local folder must be a full path (e.g. /path/to/folder or ~/folder).");
       return;
     }
     if (repoRequired && !isGitHubRepoUrl(repoUrl)) {
@@ -299,7 +300,7 @@ export function NewProjectDialog() {
                 <FolderOpen className="h-4 w-4" />
                 A local folder
               </div>
-              <p className="mt-1 text-xs text-muted-foreground">Use a full path on this machine.</p>
+              <p className="mt-1 text-xs text-muted-foreground">Full path on the machine running Paperclip (e.g. /path/to/folder or ~/folder).</p>
             </button>
             <button
               type="button"

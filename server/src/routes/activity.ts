@@ -74,7 +74,39 @@ export function activityRoutes(db: Db) {
       return;
     }
     assertCompanyAccess(req, issue.companyId);
-    const result = await svc.runsForIssue(issue.companyId, issue.id);
+    const [rows, activityRows] = await Promise.all([
+      svc.runsForIssue(issue.companyId, issue.id),
+      svc.forIssue(issue.id),
+    ]);
+    const runCreatedAtByRunId = new Map(
+      rows.map((r: Record<string, unknown>) => [r.runId as string, new Date((r.createdAt as string) ?? 0).getTime()]),
+    );
+    const commentAddedWithoutRun = activityRows
+      .filter(
+        (evt) =>
+          evt.action === "issue.comment_added" &&
+          evt.runId == null &&
+          typeof (evt.details as Record<string, unknown>)?.commentId === "string",
+      )
+      .map((evt) => ({
+        commentId: (evt.details as Record<string, unknown>).commentId as string,
+        createdAt: new Date(evt.createdAt).getTime(),
+      }));
+    const result = rows.map((row: Record<string, unknown>) => {
+      let triggerCommentId =
+        (row.triggerCommentId as string | null) ?? (row.trigger_comment_id as string | null) ?? null;
+      if (!triggerCommentId) {
+        const runCreated = runCreatedAtByRunId.get(row.runId as string);
+        if (runCreated != null) {
+          const beforeRun = commentAddedWithoutRun
+            .filter((c) => c.createdAt < runCreated)
+            .sort((a, b) => b.createdAt - a.createdAt);
+          if (beforeRun.length > 0) triggerCommentId = beforeRun[0].commentId;
+        }
+      }
+      const { trigger_comment_id: _unused, ...rest } = row;
+      return { ...rest, triggerCommentId: triggerCommentId || null };
+    });
     res.json(result);
   });
 

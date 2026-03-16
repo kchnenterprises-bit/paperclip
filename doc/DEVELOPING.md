@@ -288,6 +288,20 @@ Environment overrides:
 - `PAPERCLIP_DB_BACKUP_RETENTION_DAYS=<days>`
 - `PAPERCLIP_DB_BACKUP_DIR=/absolute/or/~/path`
 
+## Optional: Claude on Google Vertex (GCP credits)
+
+To use Claude Code via Google Vertex AI and spend GCP credits instead of Anthropic API usage, add these to the same `.env` file the server loads (repo-local: `.paperclip/.env` after `worktree init`, or default instance: `~/.paperclip/instances/default/.env`):
+
+```bash
+CLAUDE_CODE_USE_VERTEX=1
+CLOUD_ML_REGION=global
+ANTHROPIC_VERTEX_PROJECT_ID=book-writer-465122
+ANTHROPIC_DEFAULT_SONNET_MODEL=claude-sonnet-4-6
+ANTHROPIC_DEFAULT_HAIKU_MODEL=claude-haiku-4-5@20251001
+```
+
+See `.env.example` in the repo root for a commented copy. The Claude local adapter passes these through to the agent process.
+
 ## Secrets in Dev
 
 Agent env vars now support secret references. By default, secret values are stored with local encryption and only secret refs are persisted in agent config.

@@ -11,6 +11,8 @@ export interface RunForIssue {
   invocationSource: string;
   usageJson: Record<string, unknown> | null;
   resultJson: Record<string, unknown> | null;
+  /** When set, this run was triggered by this issue comment; timeline should show the comment before the run. */
+  triggerCommentId: string | null;
 }
 
 export interface IssueForRun {

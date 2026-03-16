@@ -1,6 +1,7 @@
 import type { LucideIcon } from "lucide-react";
 import type { ReactNode } from "react";
 import { Link } from "@/lib/router";
+import { cn } from "@/lib/utils";
 
 interface MetricCardProps {
   icon: LucideIcon;
@@ -33,9 +34,11 @@ export function MetricCard({ icon: Icon, value, label, description, to, onClick 
     </div>
   );
 
+  const focusRing = "outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded-lg";
+
   if (to) {
     return (
-      <Link to={to} className="no-underline text-inherit h-full" onClick={onClick}>
+      <Link to={to} className={cn("no-underline text-inherit h-full", focusRing)} onClick={onClick}>
         {inner}
       </Link>
     );
@@ -43,7 +46,7 @@ export function MetricCard({ icon: Icon, value, label, description, to, onClick 
 
   if (onClick) {
     return (
-      <div className="h-full" onClick={onClick}>
+      <div className={cn("h-full", focusRing)} onClick={onClick} role="button" tabIndex={0} onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onClick(); } }}>
         {inner}
       </div>
     );

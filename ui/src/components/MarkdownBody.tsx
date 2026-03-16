@@ -114,6 +114,37 @@ function MermaidDiagramBlock({ source, darkMode }: { source: string; darkMode: b
 
 export function MarkdownBody({ children, className }: MarkdownBodyProps) {
   const { theme } = useTheme();
+
+  function renderLink(href?: string, linkChildren?: ReactNode) {
+    const parsed = href ? parseProjectMentionHref(href) : null;
+    if (parsed) {
+      const label = linkChildren;
+      return (
+        <a
+          href={`/projects/${parsed.projectId}`}
+          className="paperclip-project-mention-chip"
+          style={mentionChipStyle(parsed.color)}
+        >
+          {label}
+        </a>
+      );
+    }
+
+    // If the link target looks like an absolute POSIX path on the local machine
+    // (e.g. "/Users/you/project/file.ts"), prefer a file:// URL so the browser
+    // opens it via Finder, which then uses the default editor.
+    let effectiveHref = href;
+    if (href && href.startsWith("/") && !href.startsWith("//")) {
+      effectiveHref = `file://${href}`;
+    }
+
+    return (
+      <a href={effectiveHref} rel="noreferrer">
+        {linkChildren}
+      </a>
+    );
+  }
+
   return (
     <div
       className={cn(
@@ -133,24 +164,7 @@ export function MarkdownBody({ children, className }: MarkdownBodyProps) {
             return <pre {...preProps}>{preChildren}</pre>;
           },
           a: ({ href, children: linkChildren }) => {
-            const parsed = href ? parseProjectMentionHref(href) : null;
-            if (parsed) {
-              const label = linkChildren;
-              return (
-                <a
-                  href={`/projects/${parsed.projectId}`}
-                  className="paperclip-project-mention-chip"
-                  style={mentionChipStyle(parsed.color)}
-                >
-                  {label}
-                </a>
-              );
-            }
-            return (
-              <a href={href} rel="noreferrer">
-                {linkChildren}
-              </a>
-            );
+            return renderLink(href, linkChildren);
           },
         }}
       >

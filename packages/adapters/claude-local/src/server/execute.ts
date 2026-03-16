@@ -310,7 +310,6 @@ export async function execute(ctx: AdapterExecutionContext): Promise<AdapterExec
   const maxTurns = asNumber(config.maxTurnsPerRun, 0);
   const dangerouslySkipPermissions = asBoolean(config.dangerouslySkipPermissions, false);
   const instructionsFilePath = asString(config.instructionsFilePath, "").trim();
-  const instructionsFileDir = instructionsFilePath ? `${path.dirname(instructionsFilePath)}/` : "";
   const commandNotes = instructionsFilePath
     ? [
         `Injected agent instructions via --append-system-prompt-file ${instructionsFilePath} (with path directive appended)`,
@@ -338,13 +337,32 @@ export async function execute(ctx: AdapterExecutionContext): Promise<AdapterExec
   const billingType = resolveClaudeBillingType(env);
   const skillsDir = await buildSkillsDir();
 
-  // When instructionsFilePath is configured, create a combined temp file that
-  // includes both the file content and the path directive, so we only need
-  // --append-system-prompt-file (Claude CLI forbids using both flags together).
+  // When instructionsFilePath is configured, resolve it (relative paths are tried
+  // against workspace cwd then process.cwd()), then create a combined temp file.
   let effectiveInstructionsFilePath = instructionsFilePath;
   if (instructionsFilePath) {
-    const instructionsContent = await fs.readFile(instructionsFilePath, "utf-8");
-    const pathDirective = `\nThe above agent instructions were loaded from ${instructionsFilePath}. Resolve any relative file references from ${instructionsFileDir}.`;
+    const candidates = path.isAbsolute(instructionsFilePath)
+      ? [instructionsFilePath]
+      : [path.resolve(cwd, instructionsFilePath), path.resolve(process.cwd(), instructionsFilePath)];
+    let resolvedPath: string | null = null;
+    for (const candidate of candidates) {
+      try {
+        const stat = await fs.stat(candidate);
+        if (stat.isFile()) {
+          resolvedPath = candidate;
+          break;
+        }
+      } catch {
+        continue;
+      }
+    }
+    if (!resolvedPath) {
+      throw new Error(
+        `ENOENT: no such file or directory, open '${instructionsFilePath}' (tried: ${candidates.join(", ")})`,
+      );
+    }
+    const instructionsContent = await fs.readFile(resolvedPath, "utf-8");
+    const pathDirective = `\nThe above agent instructions were loaded from ${resolvedPath}. Resolve any relative file references from ${path.dirname(resolvedPath)}/`;
     const combinedPath = path.join(skillsDir, "agent-instructions.md");
     await fs.writeFile(combinedPath, instructionsContent + pathDirective, "utf-8");
     effectiveInstructionsFilePath = combinedPath;
@@ -363,7 +381,7 @@ export async function execute(ctx: AdapterExecutionContext): Promise<AdapterExec
       `[paperclip] Claude session "${runtimeSessionId}" was saved for cwd "${runtimeSessionCwd}" and will not be resumed in "${cwd}".\n`,
     );
   }
-  const prompt = renderTemplate(promptTemplate, {
+  let prompt = renderTemplate(promptTemplate, {
     agentId: agent.id,
     companyId: agent.companyId,
     runId,
@@ -372,7 +390,25 @@ export async function execute(ctx: AdapterExecutionContext): Promise<AdapterExec
     run: { id: runId, source: "on_demand" },
     context,
   });
-
+  const issuePrompt = context?.paperclipIssueForPrompt as
+    | { identifier?: string | null; title?: string; description?: string }
+    | undefined;
+  if (
+    issuePrompt &&
+    (issuePrompt.title?.trim() || issuePrompt.description?.trim() || issuePrompt.identifier)
+  ) {
+    const idLine = issuePrompt.identifier?.trim() ?? "—";
+    const titleLine = issuePrompt.title?.trim() ?? "";
+    const desc = issuePrompt.description?.trim() ?? "";
+    prompt += `\n\n---\n## Paperclip task (full issue — use this as your scope)\n\n**${idLine}**${titleLine ? ` — ${titleLine}` : ""}\n\n### Issue description\n\n${desc || "(no description)"}\n\nProceed with this work. Call GET /api/issues/{id} if you need live state; the description above is the task spec.\n`;
+  }
+  const wakeCommentBody =
+    typeof context?.wakeCommentBody === "string" && context.wakeCommentBody.trim().length > 0
+      ? context.wakeCommentBody.trim()
+      : null;
+  if (wakeCommentBody) {
+    prompt += `\n\n---\nLatest comment on this issue (respond in context of the task above):\n\n${wakeCommentBody}`;
+  }
   const buildClaudeArgs = (resumeSessionId: string | null) => {
     const args = ["--print", "-", "--output-format", "stream-json", "--verbose"];
     if (resumeSessionId) args.push("--resume", resumeSessionId);

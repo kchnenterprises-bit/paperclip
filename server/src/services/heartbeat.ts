@@ -23,7 +23,7 @@ import { createLocalAgentJwt } from "../agent-auth-jwt.js";
 import { parseObject, asBoolean, asNumber, appendWithCap, MAX_EXCERPT_BYTES } from "../adapters/utils.js";
 import { costService } from "./costs.js";
 import { secretService } from "./secrets.js";
-import { resolveDefaultAgentWorkspaceDir } from "../home-paths.js";
+import { resolveDefaultAgentWorkspaceDir, resolveHomeAwarePath } from "../home-paths.js";
 import { summarizeHeartbeatRunResultJson } from "./heartbeat-run-summary.js";
 import {
   buildWorkspaceReadyComment,
@@ -570,11 +570,12 @@ export function heartbeatService(db: Db) {
       const missingProjectCwds: string[] = [];
       let hasConfiguredProjectCwd = false;
       for (const workspace of projectWorkspaceRows) {
-        const projectCwd = readNonEmptyString(workspace.cwd);
-        if (!projectCwd || projectCwd === REPO_ONLY_CWD_SENTINEL) {
+        const rawCwd = readNonEmptyString(workspace.cwd);
+        if (!rawCwd || rawCwd === REPO_ONLY_CWD_SENTINEL) {
           continue;
         }
         hasConfiguredProjectCwd = true;
+        const projectCwd = resolveHomeAwarePath(rawCwd);
         const projectCwdExists = await fs
           .stat(projectCwd)
           .then((stats) => stats.isDirectory())
@@ -591,7 +592,7 @@ export function heartbeatService(db: Db) {
             warnings: [],
           };
         }
-        missingProjectCwds.push(projectCwd);
+        missingProjectCwds.push(rawCwd);
       }
 
       const fallbackCwd = resolveDefaultAgentWorkspaceDir(agent.id);
@@ -1123,6 +1124,7 @@ export function heartbeatService(db: Db) {
 
     const runtime = await ensureRuntimeState(agent);
     const context = parseObject(run.contextSnapshot);
+    const wakeReason = readNonEmptyString(context.wakeReason);
     const taskKey = deriveTaskKey(context, null);
     const sessionCodec = getAdapterSessionCodec(agent.adapterType);
     const issueId = readNonEmptyString(context.issueId);
@@ -1457,6 +1459,44 @@ export function heartbeatService(db: Db) {
           "local agent jwt secret missing or invalid; running without injected PAPERCLIP_API_KEY",
         );
       }
+      // Inject full issue (title + description) so the model always has the task spec without an extra API round-trip.
+      if (issueId) {
+        try {
+          const issueRow = await db
+            .select({
+              identifier: issues.identifier,
+              title: issues.title,
+              description: issues.description,
+            })
+            .from(issues)
+            .where(and(eq(issues.id, issueId), eq(issues.companyId, agent.companyId)))
+            .then((rows) => rows[0] ?? null);
+          if (issueRow) {
+            const rawDesc = issueRow.description ?? "";
+            const description =
+              rawDesc.length > 60_000 ? `${rawDesc.slice(0, 60_000)}\n\n[… description truncated …]` : rawDesc;
+            context.paperclipIssueForPrompt = {
+              identifier: issueRow.identifier,
+              title: redactCurrentUserText(issueRow.title),
+              description: redactCurrentUserText(description),
+            };
+          }
+        } catch (err) {
+          logger.warn({ err, runId: run.id, issueId }, "failed to load issue for prompt context");
+        }
+      }
+      // Inject the triggering comment body into context so the agent can act on board directives.
+      const wakeCommentId = readNonEmptyString(context.wakeCommentId);
+      if (issueId && wakeCommentId) {
+        try {
+          const wakeComment = await issuesSvc.getComment(wakeCommentId);
+          if (wakeComment && wakeComment.issueId === issueId && wakeComment.body) {
+            context.wakeCommentBody = wakeComment.body;
+          }
+        } catch (err) {
+          logger.warn({ err, runId: run.id, wakeCommentId }, "failed to load wake comment body for context");
+        }
+      }
       const adapterResult = await adapter.execute({
         runId: run.id,
         agent,
@@ -1627,6 +1667,28 @@ export function heartbeatService(db: Db) {
               lastRunId: finalizedRun.id,
               lastError: outcome === "succeeded" ? null : (adapterResult.errorMessage ?? "run_failed"),
             });
+          }
+        }
+
+        // When an agent run was triggered by an issue comment and it succeeded,
+        // automatically post the agent's final summary back to the issue as a comment.
+        if (
+          outcome === "succeeded" &&
+          issueId &&
+          adapterResult.summary &&
+          (wakeReason === "issue_commented" ||
+            wakeReason === "issue_comment_mentioned" ||
+            wakeReason === "issue_reopened_via_comment")
+        ) {
+          try {
+            await issuesSvc.addComment(issueId, adapterResult.summary, { agentId: agent.id });
+          } catch (err) {
+            await onLog(
+              "stderr",
+              `[paperclip] Failed to post agent summary comment: ${
+                err instanceof Error ? err.message : String(err)
+              }\n`,
+            );
           }
         }
       }

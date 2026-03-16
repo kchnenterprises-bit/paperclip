@@ -22,6 +22,8 @@ interface LinkedRunItem {
   agentId: string;
   createdAt: Date | string;
   startedAt: Date | string | null;
+  /** When set, this run was triggered by this issue comment; show that comment before the run. */
+  triggerCommentId?: string | null;
 }
 
 interface CommentReassignment {
@@ -249,12 +251,24 @@ export function CommentThread({
       createdAtMs: new Date(comment.createdAt).getTime(),
       comment,
     }));
-    const runItems: TimelineItem[] = linkedRuns.map((run) => ({
-      kind: "run",
-      id: run.runId,
-      createdAtMs: new Date(run.startedAt ?? run.createdAt).getTime(),
-      run,
-    }));
+    const runItems: TimelineItem[] = linkedRuns.map((run) => {
+      const baseMs = new Date(run.startedAt ?? run.createdAt).getTime();
+      const triggerId = run.triggerCommentId ?? (run as { trigger_comment_id?: string | null }).trigger_comment_id;
+      let sortMs = baseMs;
+      if (triggerId && comments.length > 0) {
+        const triggerComment = comments.find((c) => c.id === triggerId);
+        if (triggerComment) {
+          const commentMs = new Date(triggerComment.createdAt).getTime();
+          sortMs = Math.max(baseMs, commentMs + 1);
+        }
+      }
+      return {
+        kind: "run",
+        id: run.runId,
+        createdAtMs: sortMs,
+        run,
+      };
+    });
     return [...commentItems, ...runItems].sort((a, b) => {
       if (a.createdAtMs !== b.createdAtMs) return a.createdAtMs - b.createdAtMs;
       if (a.kind === b.kind) return a.id.localeCompare(b.id);

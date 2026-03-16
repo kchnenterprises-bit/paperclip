@@ -64,6 +64,8 @@ GET /api/issues/{issueId}/comments
 
 Read ancestors to understand why this task exists. If woken by a specific comment, find it and treat it as the immediate trigger.
 
+**When `context.wakeCommentBody` is set:** The run was triggered by a board or user comment. The server injects that comment’s full text into `context.wakeCommentBody`. You **must** read it first. Parse any numbered list, explicit approvals (“approve”, “mark as done”, “put on hold”), or direct instructions. Execute each one via the API (PATCH issue status, post confirmations, etc.) **before** doing your usual “review assignments” flow. Then post a single summary comment that reflects what you did in response to the board.
+
 ### Step 7: Do the Work
 
 Use your tools and capabilities to complete the task.

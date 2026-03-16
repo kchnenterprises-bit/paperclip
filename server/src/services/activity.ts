@@ -72,6 +72,10 @@ export function activityService(db: Db) {
           invocationSource: heartbeatRuns.invocationSource,
           usageJson: heartbeatRuns.usageJson,
           resultJson: heartbeatRuns.resultJson,
+          triggerCommentId: sql<string>`coalesce(
+            ${heartbeatRuns.contextSnapshot}->>'wakeCommentId',
+            ${heartbeatRuns.contextSnapshot}->>'commentId'
+          )`.as("trigger_comment_id"),
         })
         .from(heartbeatRuns)
         .where(

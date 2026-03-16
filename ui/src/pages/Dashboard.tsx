@@ -22,6 +22,7 @@ import { cn, formatCents } from "../lib/utils";
 import { Bot, CircleDot, DollarSign, ShieldCheck, LayoutDashboard } from "lucide-react";
 import { ActiveAgentsPanel } from "../components/ActiveAgentsPanel";
 import { ChartCard, RunActivityChart, PriorityChart, IssueStatusChart, SuccessRateChart } from "../components/ActivityCharts";
+import { IssueTimeline } from "../components/IssueTimeline";
 import { PageSkeleton } from "../components/PageSkeleton";
 import type { Agent, Issue } from "@paperclipai/shared";
 
@@ -198,7 +199,7 @@ export function Dashboard() {
           </div>
           <button
             onClick={() => openOnboarding({ initialStep: 2, companyId: selectedCompanyId! })}
-            className="text-sm font-medium text-amber-700 hover:text-amber-900 dark:text-amber-300 dark:hover:text-amber-100 underline underline-offset-2 shrink-0"
+            className="min-h-[44px] min-w-[44px] inline-flex items-center justify-center text-sm font-medium text-amber-700 hover:text-amber-900 dark:text-amber-300 dark:hover:text-amber-100 underline underline-offset-2 shrink-0 outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded-md"
           >
             Create one here
           </button>
@@ -206,6 +207,13 @@ export function Dashboard() {
       )}
 
       <ActiveAgentsPanel companyId={selectedCompanyId!} />
+
+      <div className="border border-border rounded-lg p-4">
+        <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-4">
+          Issue Timeline
+        </h3>
+        <IssueTimeline issues={issues ?? []} isLoading={!issues && !!selectedCompanyId} variant="horizontal" />
+      </div>
 
       {data && (
         <>
@@ -313,7 +321,7 @@ export function Dashboard() {
                     <Link
                       key={issue.id}
                       to={`/issues/${issue.identifier ?? issue.id}`}
-                      className="px-4 py-3 text-sm cursor-pointer hover:bg-accent/50 transition-colors no-underline text-inherit block"
+                      className="min-h-[44px] flex px-4 py-3 text-sm cursor-pointer hover:bg-accent/50 transition-colors no-underline text-inherit outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset"
                     >
                       <div className="flex items-start gap-2 sm:items-center sm:gap-3">
                         {/* Status icon - left column on mobile */}
